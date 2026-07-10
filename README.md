@@ -1,7 +1,5 @@
 # Collaborative Rich-Text Editor
 
-Status: complete
-
 A custom CRDT-based collaborative rich-text editor built for a 48-hour take-home assignment. It operates entirely without operational transformation (OT) libraries or managed backend sync services.
 
 ## Architecture & Algorithm
