@@ -190,6 +190,50 @@ export class Document {
       .map(c => c.value)
       .join('');
   }
+
+  getFormattedText() {
+    const visibleChars = this.getVisibleCharacters();
+    return visibleChars.map(c => {
+      const activeOps = this.formatOps.filter(op => 
+        comparePositionIds(op.rangeStart, c.id) <= 0 &&
+        comparePositionIds(op.rangeEnd, c.id) >= 0
+      );
+      
+      const formats: Record<string, any> = {};
+      const latestOps: Record<string, FormatOp> = {};
+      
+      for (const op of activeOps) {
+        const existing = latestOps[op.attr];
+        if (!existing || op.clock > existing.clock || (op.clock === existing.clock && op.siteId > existing.siteId)) {
+          latestOps[op.attr] = op;
+          formats[op.attr] = op.value;
+        }
+      }
+      
+      return { char: c.value, formats, id: c.id };
+    });
+  }
+
+  serialize(): any {
+    return {
+      siteId: this.siteId,
+      clock: this.clock,
+      characters: this.characters,
+      formatOps: this.formatOps
+    };
+  }
+
+  loadState(data: any) {
+    const dummy = new Document(data.siteId);
+    dummy.clock = data.clock;
+    dummy.characters = data.characters;
+    dummy.formatOps = data.formatOps;
+    
+    const merged = merge(this, dummy);
+    this.characters = merged.characters;
+    this.formatOps = merged.formatOps;
+    this.clock = Math.max(this.clock, merged.clock);
+  }
 }
 
 /**

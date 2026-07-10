@@ -10,13 +10,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "lucide-react": "^1.24.0",
+    "quill": "^2.0.3",
+    "quill-cursors": "^5.0.0",
+    "quill-delta": "^5.1.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
+    "@types/quill": "^2.0.14",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
     "typescript": "~6.0.2",
