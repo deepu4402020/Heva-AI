@@ -88,6 +88,7 @@ export default function Editor({ roomId, userName }: { roomId: string, userName:
               try {
                 cursorsRef.current.createCursor(p.siteId, p.name, 'blue');
                 cursorsRef.current.moveCursor(p.siteId, { index: p.cursorPosition, length: 0 });
+                cursorsRef.current.toggleFlag(p.siteId, true);
               } catch (e) {
                 // Ignore cursor errors (e.g. index out of bounds while syncing)
               }
@@ -101,11 +102,13 @@ export default function Editor({ roomId, userName }: { roomId: string, userName:
           }));
         } else if (msg.type === 'sync-response') {
           // Load peer state (merges into our own)
+          const cursor = captureCursor();
           crdtRef.current.loadState(msg.state);
-          rebuildEditorFromCRDT();
-        } else if (msg.type === 'op' || msg.type === 'format') {
+          rebuildEditorFromCRDT(cursor);
+        } else if (msg.type === 'insert' || msg.type === 'delete' || msg.type === 'format') {
+          const cursor = captureCursor();
           crdtRef.current.applyRemoteOp(msg);
-          rebuildEditorFromCRDT();
+          rebuildEditorFromCRDT(cursor);
         }
       };
     };
@@ -130,7 +133,7 @@ export default function Editor({ roomId, userName }: { roomId: string, userName:
           if (op.attributes) {
             for (const key of Object.keys(op.attributes)) {
               const formatOp = crdtRef.current.localFormat(crdtIndex, crdtIndex + retainCount - 1, key, op.attributes[key]);
-              sendOp(formatOp);
+              if (formatOp) sendOp(formatOp);
             }
           }
           crdtIndex += retainCount;
@@ -150,7 +153,7 @@ export default function Editor({ roomId, userName }: { roomId: string, userName:
               if (op.attributes) {
                 for (const key of Object.keys(op.attributes)) {
                   const formatOp = crdtRef.current.localFormat(crdtIndex, crdtIndex, key, op.attributes[key]);
-                  sendOp(formatOp);
+                  if (formatOp) sendOp(formatOp);
                 }
               }
               crdtIndex++;
@@ -174,24 +177,28 @@ export default function Editor({ roomId, userName }: { roomId: string, userName:
     };
   }, [roomId, userName]);
 
-  function rebuildEditorFromCRDT() {
+  function captureCursor() {
+    const quill = quillRef.current;
+    if (!quill) return null;
+    const sel = quill.getSelection();
+    if (!sel) return null;
+    
+    let cursorId: any = null;
+    let cursorOffset = 0;
+    const visible = crdtRef.current.getVisibleCharacters();
+    if (sel.index < visible.length) {
+      cursorId = visible[sel.index].id;
+    } else if (visible.length > 0) {
+      cursorId = visible[visible.length - 1].id;
+      cursorOffset = 1;
+    }
+    return { cursorId, cursorOffset, length: sel.length };
+  }
+
+  function rebuildEditorFromCRDT(savedCursor?: any) {
     isSyncingRef.current = true;
     const quill = quillRef.current;
     if (!quill) return;
-
-    // Save selection anchored to CRDT PositionId
-    const sel = quill.getSelection();
-    let cursorId: any = null;
-    let cursorOffset = 0;
-    if (sel) {
-      const visible = crdtRef.current.getVisibleCharacters();
-      if (sel.index < visible.length) {
-        cursorId = visible[sel.index].id;
-      } else if (visible.length > 0) {
-        cursorId = visible[visible.length - 1].id;
-        cursorOffset = 1;
-      }
-    }
 
     // Build full Delta from CRDT
     const formatted = crdtRef.current.getFormattedText();
@@ -221,11 +228,11 @@ export default function Editor({ roomId, userName }: { roomId: string, userName:
     quill.setContents(delta, 'api');
 
     // Restore selection
-    if (cursorId) {
+    if (savedCursor && savedCursor.cursorId) {
       const visible = crdtRef.current.getVisibleCharacters();
-      const idx = visible.findIndex(c => JSON.stringify(c.id) === JSON.stringify(cursorId));
+      const idx = visible.findIndex(c => JSON.stringify(c.id) === JSON.stringify(savedCursor.cursorId));
       if (idx !== -1) {
-        quill.setSelection(idx + cursorOffset, sel?.length || 0, 'api');
+        quill.setSelection(idx + savedCursor.cursorOffset, savedCursor.length || 0, 'api');
       }
     }
     isSyncingRef.current = false;
@@ -238,9 +245,14 @@ export default function Editor({ roomId, userName }: { roomId: string, userName:
         <p style={{ color: status === 'Online' ? 'green' : 'red', fontWeight: 'bold' }}>{status}</p>
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {presence.map((p, i) => (
-            <li key={i} style={{ padding: '8px 0', borderBottom: '1px solid #eee' }}>
+            <li key={i} style={{ padding: '8px 0', borderBottom: '1px solid #eee', fontSize: '14px' }}>
               <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: p.siteId === crdtRef.current.siteId ? 'green' : 'blue', marginRight: '8px' }}></span>
               {p.name} {p.siteId === crdtRef.current.siteId ? '(You)' : ''}
+              {p.cursorPosition !== null && p.cursorPosition !== undefined && (
+                <span style={{ display: 'block', color: '#888', marginLeft: '18px', marginTop: '4px', fontSize: '12px' }}>
+                  Pos: {p.cursorPosition}
+                </span>
+              )}
             </li>
           ))}
         </ul>

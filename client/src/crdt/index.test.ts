@@ -204,4 +204,25 @@ describe('CRDT Core', () => {
     expect(docA.formatOps.length).toBe(4);
     expect(docB.formatOps.length).toBe(4);
   });
+
+  test('Bug where ID is greater than next', () => {
+    const docA = new Document('A');
+    docA.localInsert(0, 'X'); // ID: [1, A]
+    docA.localInsert(0, 'Y'); // ID: [0, A, 1, A] (or similar)
+    
+    const docB = new Document('B');
+    // Sync to B
+    docB.applyRemoteOp({ type: 'insert', char: docA.characters[1] }); // X
+    docB.applyRemoteOp({ type: 'insert', char: docA.characters[0] }); // Y
+    
+    // B inserts at index 0 (before Y)
+    const op = docB.localInsert(0, 'Z');
+    
+    // Z should be at index 0.
+    expect(docB.characters[0].value).toBe('Z');
+    
+    // Sync Z to A
+    docA.applyRemoteOp(op);
+    expect(docA.characters[0].value).toBe('Z');
+  });
 });

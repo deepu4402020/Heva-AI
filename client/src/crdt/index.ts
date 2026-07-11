@@ -56,21 +56,21 @@ export function generatePositionBetween(
   let depth = 0;
   
   while (true) {
-    const id1 = p1[depth];
-    const id2 = p2[depth];
+    const id1 = p1[depth] || { digit: 0, siteId: '' };
+    const id2 = p2[depth] || { digit: BASE, siteId: '' };
     
-    const d1 = id1 ? id1.digit : 0;
-    const d2 = id2 ? id2.digit : BASE;
+    const d1 = id1.digit;
+    const d2 = id2.digit;
     
     // Prefix matches entirely at this depth
-    if (id1 && id2 && d1 === d2 && id1.siteId === id2.siteId) {
+    if (d1 === d2 && id1.siteId === id2.siteId) {
       newPos.push({ digit: d1, siteId: id1.siteId });
       depth++;
       continue;
     }
     
     // Same digit, different siteId
-    if (id1 && id2 && d1 === d2) {
+    if (d1 === d2) {
       // Branch under id1 so that it's strictly less than id2
       newPos.push({ digit: d1, siteId: id1.siteId });
       p2 = []; // Next levels are unconstrained by p2
@@ -80,12 +80,15 @@ export function generatePositionBetween(
     
     // There is room to allocate a new digit
     if (d2 - d1 > 1) {
-      newPos.push({ digit: d1 + 1, siteId });
+      // Add randomness to prevent interleaving between concurrent typers
+      const step = Math.min(10, d2 - d1 - 1);
+      const randStep = Math.floor(Math.random() * step) + 1;
+      newPos.push({ digit: d1 + randStep, siteId });
       return { pos: newPos, clock };
     } 
     // d2 - d1 === 1 (or less, though theoretically it shouldn't be less unless base boundaries)
     else {
-      newPos.push({ digit: d1, siteId: id1 ? id1.siteId : siteId });
+      newPos.push({ digit: d1, siteId: id1.siteId });
       p2 = []; // Next levels are unconstrained by p2
       depth++;
     }
@@ -144,6 +147,9 @@ export class Document {
   localFormat(startIndex: number, endIndex: number, attr: string, value: any) {
     this.clock++;
     const visibleChars = this.getVisibleCharacters();
+    if (startIndex >= visibleChars.length) return null;
+    if (endIndex >= visibleChars.length) endIndex = visibleChars.length - 1;
+    
     const rangeStart = visibleChars[startIndex].id;
     const rangeEnd = visibleChars[endIndex].id;
     
