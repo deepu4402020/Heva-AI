@@ -68,6 +68,12 @@ export default function Editor({ roomId, userName }: { roomId: string, userName:
 
         // Request peer sync for initial state
         ws.send(JSON.stringify({ type: 'sync-request' }));
+
+        // Broadcast our state to recover any ops lost in a half-open TCP connection
+        ws.send(JSON.stringify({
+          type: 'sync-response',
+          state: crdtRef.current.serialize()
+        }));
       };
 
       ws.onclose = () => {
@@ -172,8 +178,16 @@ export default function Editor({ roomId, userName }: { roomId: string, userName:
       }
     });
 
+    const handleOffline = () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.close(); // Force close to transition to offline queueing immediately
+      }
+    };
+    window.addEventListener('offline', handleOffline);
+
     return () => {
       if (wsRef.current) wsRef.current.close();
+      window.removeEventListener('offline', handleOffline);
     };
   }, [roomId, userName]);
 
