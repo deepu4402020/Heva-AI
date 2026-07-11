@@ -91,7 +91,7 @@ wss.on('connection', (ws) => {
       client.cursorPosition = msg.cursorPosition;
       broadcastPresence(client.roomId);
     }
-    else if (msg.type === 'op' || msg.type === 'sync-request' || msg.type === 'sync-response') {
+    else if (msg.type === 'insert' || msg.type === 'delete' || msg.type === 'format' || msg.type === 'sync-request' || msg.type === 'sync-response') {
       // Broadcast verbatim to everyone else in the room
       if (!client.roomId) return;
       
